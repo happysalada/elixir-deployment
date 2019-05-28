@@ -1,0 +1,74 @@
+version: '3.2'
+
+volumes:
+    metabase_data: {}
+
+networks:
+  webnet:
+    driver: overlay
+    attachable: true
+
+services:
+  web:
+    image: "happysalada/union:e7b9d6ad"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "80:${PORT}"
+      - "443:${HTTPS_PORT}"
+    volumes:
+    - .:/app
+    env_file:
+     - ./config/docker.env
+    networks:
+      - webnet
+
+  pghero:
+    image: ankane/pghero:v2.2.0
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      restart_policy:
+        condition: on-failure
+    ports:
+      - 8080:8080
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    networks:
+      - webnet
+
+  metabase:
+    image: metabase/metabase:latest
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - "./metabase-data:/metabase-data"
+    ports:
+      - "3000:3000"
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_DBNAME=${POSTGRES_DB}
+      - MB_DB_PORT=${POSTGRES_PORT}
+      - MB_DB_USER=${POSTGRES_USER}
+      - MB_DB_PASS=${POSTGRES_PASSWORD}
+      - MB_DB_HOST=${POSTGRES_HOSTNAME}
+    networks:
+      - webnet
+
+  logspout:
+    image: gliderlabs/logspout:v3.2.6
+    command: ["syslog+tls://logs7.papertrailapp.com:34923"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+        delay: 30s

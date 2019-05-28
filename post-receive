@@ -1,0 +1,17 @@
+#!/bin/bash
+GIT_DIR="/opt/deploy.git"
+TARGET="/opt/deploy"
+BRANCH="master"
+
+while read -r oldrev newrev ref
+do
+        # only checking out the master (or whatever branch you would like to deploy)
+        if [[ $ref =~ refs/heads/$BRANCH ]]; then
+                echo "Ref $ref received. building ${BRANCH}"
+                sudo git --work-tree="$TARGET" --git-dir="$GIT_DIR" checkout -f
+                docker login --username happysalada --password REPLACE_WITH_PASSWORD
+                cd "$TARGET" && make build;
+        else
+                echo "Ref $ref received. Doing nothing: only the ${BRANCH} branch may be deployed on this server."
+        fi
+done
